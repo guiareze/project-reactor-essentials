@@ -4,9 +4,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Test;
 import org.reactivestreams.Subscription;
 import reactor.core.publisher.BaseSubscriber;
+import reactor.core.publisher.ConnectableFlux;
 import reactor.core.publisher.Flux;
 import reactor.test.StepVerifier;
 
+import java.time.Duration;
 import java.util.List;
 
 @Slf4j
@@ -92,7 +94,7 @@ public class FluxTest {
     }
 
     @Test
-    public void fluxSubscriberNumbersErrorsCorrectBackPressure() {
+    public void fluxSubscriberNumbersErrorsAlmostCorrectBackPressure() {
         Flux<Integer> fluxString = Flux.range(1,10)
                 .log();
 
@@ -120,6 +122,48 @@ public class FluxTest {
 
         StepVerifier.create(fluxString)
                 .expectNext(1,2,3,4,5,6,7,8,9,10)
+                .verifyComplete();
+    }
+
+    @Test
+    public void fluxSubscriberNumbersErrorsCorrectBackPressure() {
+        Flux<Integer> fluxString = Flux.range(1,10)
+                .log()
+                .limitRate(3);
+
+        fluxString.subscribe(i -> log.info("Number {}", i));
+
+        log.info("-----------------------------------");
+
+        StepVerifier.create(fluxString)
+                .expectNext(1,2,3,4,5,6,7,8,9,10)
+                .verifyComplete();
+    }
+
+    @Test
+    public void connectableFlux() throws Exception{
+        ConnectableFlux<Integer> connectableFlux = Flux.range(1, 10)
+                .log()
+                .delayElements(Duration.ofMillis(100))
+                .publish();
+
+        StepVerifier.create(connectableFlux)
+                .then(connectableFlux::connect)
+                .expectNext(1,2,3,4,5,6,7,8,9,10)
+                .verifyComplete();
+    }
+
+    @Test
+    public void connectableFluxAutoConnect() throws Exception{
+        Flux<Integer> connectableFlux = Flux.range(1, 5)
+                .log()
+                .delayElements(Duration.ofMillis(100))
+                .publish()
+                .autoConnect(2);
+
+        StepVerifier.create(connectableFlux)
+                .then(connectableFlux::subscribe)
+                .expectNext(1,2,3,4,5)
                 .verifyComplete();
     }
 
